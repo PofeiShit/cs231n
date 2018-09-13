@@ -1,2 +1,2 @@
 # cs231n
-assignment2做了pytorch.ipynb
+Pytorch done

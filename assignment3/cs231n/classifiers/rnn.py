@@ -140,7 +140,23 @@ class CaptioningRNN(object):
         # Note also that you are allowed to make use of functions from layers.py   #
         # in your implementation, if needed.                                       #
         ############################################################################
-        pass
+        h_out, h_cache = affine_forward(features, W_proj, b_proj)
+        word_out, word_cache = word_embedding_forward(captions_in, W_embed)
+        rnn_out, rnn_cache = rnn_forward(word_out, h_out, Wx, Wh, b)
+        temp_out, temp_cache = temporal_affine_forward(rnn_out, W_vocab, b_vocab)
+        loss, dscores = temporal_softmax_loss(temp_out, captions_out, mask)
+        dx_temp, dw_temp, db_temp = temporal_affine_backward(dscores, temp_cache)
+        grads['W_vocab'] = dw_temp
+        grads['b_vocab'] = db_temp
+        dx_rnn, dh0_rnn, dWx_rnn, dWh_rnn, db_rnn = rnn_backward(dx_temp, rnn_cache)
+        grads['Wx'] = dWx_rnn
+        grads['Wh'] = dWh_rnn
+        grads['b'] = db_rnn
+        dW_temp = word_embedding_backward(dx_rnn, word_cache)
+        grads['W_embed'] = dW_temp
+        dx_affine, dw_affine, db_affine = affine_backward(dh0_rnn, h_cache)
+        grads['W_proj'] = dw_affine
+        grads['b_proj'] = db_affine
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
