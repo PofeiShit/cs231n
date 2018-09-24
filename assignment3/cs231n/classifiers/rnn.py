@@ -142,13 +142,19 @@ class CaptioningRNN(object):
         ############################################################################
         h_out, h_cache = affine_forward(features, W_proj, b_proj)
         word_out, word_cache = word_embedding_forward(captions_in, W_embed)
-        rnn_out, rnn_cache = rnn_forward(word_out, h_out, Wx, Wh, b)
+        if self.cell_type == 'rnn':
+            rnn_out, rnn_cache = rnn_forward(word_out, h_out, Wx, Wh, b)
+        elif self.cell_type == 'lstm':
+            rnn_out, rnn_cache = lstm_forward(word_out, h_out, Wx, Wh, b)
         temp_out, temp_cache = temporal_affine_forward(rnn_out, W_vocab, b_vocab)
         loss, dscores = temporal_softmax_loss(temp_out, captions_out, mask)
         dx_temp, dw_temp, db_temp = temporal_affine_backward(dscores, temp_cache)
         grads['W_vocab'] = dw_temp
         grads['b_vocab'] = db_temp
-        dx_rnn, dh0_rnn, dWx_rnn, dWh_rnn, db_rnn = rnn_backward(dx_temp, rnn_cache)
+        if self.cell_type == 'rnn':
+            dx_rnn, dh0_rnn, dWx_rnn, dWh_rnn, db_rnn = rnn_backward(dx_temp, rnn_cache)
+        elif self.cell_type == 'lstm':
+            dx_rnn, dh0_rnn, dWx_rnn, dWh_rnn, db_rnn = lstm_backward(dx_temp, rnn_cache)
         grads['Wx'] = dWx_rnn
         grads['Wh'] = dWh_rnn
         grads['b'] = db_rnn
@@ -222,11 +228,16 @@ class CaptioningRNN(object):
         # you are using an LSTM, initialize the first cell state to zeros.        #
         ###########################################################################
         h_out, h_cache = affine_forward(features, W_proj, b_proj)
+        prev_c = np.zeros_like(h_out)
         x = np.array([self._start for i in range(N)])
         captions[:, 0] = self._start
         for t in range(1, max_length):
             x_emb, _ = word_embedding_forward(x, W_embed)
-            next_h, cache = rnn_step_forward(x_emb, h_out, Wx, Wh, b)
+            if self.cell_type == 'rnn':
+                next_h, cache = rnn_step_forward(x_emb, h_out, Wx, Wh, b)
+            elif self.cell_type == 'lstm':
+                next_h, next_c, cache = lstm_step_forward(x_emb, h_out, prev_c, Wx, Wh, b)
+                prev_c = next_c
             h_out = next_h
             vocab_out, vocab_cache = affine_forward(next_h, W_vocab, b_vocab)
             x = vocab_out.argmax(1)
